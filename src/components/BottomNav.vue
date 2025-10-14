@@ -6,13 +6,17 @@ const route = useRoute();
 
 const items = [
   { name: 'home', icon: '🏠', text: '首页' },
-  { name: 'category', icon: '📋', text: '分类' },
+  { name: 'categories', icon: '📋', text: '分类' },
   { name: 'favorites', icon: '❤️', text: '收藏' },
   { name: 'profile', icon: '👤', text: '我的' }
 ];
 
 function go(name: string) {
-  router.push({ name });
+  if (name === 'home') {
+    router.push({ name: 'poems' });
+  } else {
+    router.push({ name });
+  }
 }
 </script>
 

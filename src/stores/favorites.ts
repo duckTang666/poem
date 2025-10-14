@@ -1,20 +1,20 @@
 import { defineStore } from 'pinia';
-import type { Poem } from '../data/poems';
+import type { PoemRecord } from '../data/repository';
 
-type FavItem = Poem;
+type FavItem = PoemRecord;
 
 const KEY = 'poem_app_favorites';
 
-function load(): FavItem[] {
+function load(): number[] {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as FavItem[]) : [];
+    return raw ? (JSON.parse(raw) as number[]) : [];
   } catch {
     return [];
   }
 }
 
-function save(list: FavItem[]) {
+function save(list: number[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(list));
   } catch {}
@@ -22,33 +22,30 @@ function save(list: FavItem[]) {
 
 export const useFavoritesStore = defineStore('favorites', {
   state: () => ({
-    list: load() as FavItem[]
+    list: load() as number[]
   }),
   getters: {
-    titles(state): string[] {
-      return state.list.map((p) => p.title);
-    },
     has:
       (state) =>
-      (title: string): boolean =>
-        state.list.some((p) => p.title === title)
+      (poemId: number): boolean =>
+        state.list.includes(poemId)
   },
   actions: {
-    add(item: FavItem) {
-      if (!this.list.find((p) => p.title === item.title)) {
-        this.list.push(item);
+    add(poemId: number) {
+      if (!this.list.includes(poemId)) {
+        this.list.push(poemId);
         save(this.list);
       }
     },
-    remove(title: string) {
-      this.list = this.list.filter((p) => p.title !== title);
+    remove(poemId: number) {
+      this.list = this.list.filter(id => id !== poemId);
       save(this.list);
     },
-    toggle(item: FavItem) {
-      if (this.has(item.title)) {
-        this.remove(item.title);
+    toggle(poemId: number) {
+      if (this.has(poemId)) {
+        this.remove(poemId);
       } else {
-        this.add(item);
+        this.add(poemId);
       }
     },
     clear() {

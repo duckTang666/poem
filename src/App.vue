@@ -6,7 +6,8 @@ import BaseButton from './components/BaseButton.vue';
 <template>
   <main class="container">
 
-    <BaseButton @click="() => $router.push('/about')">进入 About</BaseButton>
+
+
     <router-view />
   </main>
 </template>

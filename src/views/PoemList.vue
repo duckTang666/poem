@@ -65,8 +65,8 @@
             <div class="poem-actions">
               <button @click.stop="toggleFavorite(poem)" 
                       class="favorite-btn" 
-                      :class="{ active: poem.favorite }">
-                {{ poem.favorite ? '💖' : '🤍' }} {{ poem.favorite ? '已收藏' : '收藏' }}
+                      :class="{ active: favoritesStore.has(poem.id) }">
+                {{ favoritesStore.has(poem.id) ? '💖' : '🤍' }} {{ favoritesStore.has(poem.id) ? '已收藏' : '收藏' }}
               </button>
             </div>
           </div>
@@ -111,8 +111,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue';
-import { fetchPoems, togglePoemFavorite, type PoemDTO } from '@/api/poems';
+import { fetchPoems, type PoemDTO } from '@/api/poems';
 import '@/styles/poem-list.css';
+import { useRouter } from 'vue-router';
+import { useFavoritesStore } from '../stores/favorites';
+
+const router = useRouter();
+const favoritesStore = useFavoritesStore();
 
 // 数据状态
 const poems = ref<PoemDTO[]>([]);
@@ -130,9 +135,14 @@ const categories = ref([
   { name: "全部", filter: () => true },
   { name: "唐诗", filter: (p: PoemDTO) => p.dynasty === "唐" },
   { name: "宋词", filter: (p: PoemDTO) => p.dynasty === "宋" },
-  { name: "已收藏", filter: (p: PoemDTO) => !!p.favorite },
+  { name: "元曲", filter: (p: PoemDTO) => p.dynasty === "元" },
+  { name: "明诗", filter: (p: PoemDTO) => p.dynasty === "明" },
+  { name: "清诗", filter: (p: PoemDTO) => p.dynasty === "清" },
+  { name: "现代诗", filter: (p: PoemDTO) => p.dynasty === "近现代" },
   { name: "李白", filter: (p: PoemDTO) => p.author === "李白" },
-  { name: "其他", filter: (p: PoemDTO) => !["唐", "宋"].includes(p.dynasty) }
+  { name: "苏轼", filter: (p: PoemDTO) => p.author === "苏轼" },
+  { name: "李清照", filter: (p: PoemDTO) => p.author === "李清照" },
+  { name: "毛泽东", filter: (p: PoemDTO) => p.author === "毛泽东" }
 ]);
 
 // 轮播图数据（基于实际诗词数据生成）
@@ -200,20 +210,13 @@ async function loadPoems() {
 }
 
 // 切换收藏状态
-async function toggleFavorite(poem: PoemDTO) {
-  try {
-    const res = await togglePoemFavorite(poem.id);
-    if (res.code === 0) {
-      poem.favorite = !!res.data.favorite;
-    }
-  } catch (e) {
-    console.error(e);
-  }
+function toggleFavorite(poem: PoemDTO) {
+  favoritesStore.toggle(poem.id);
 }
 
 // 事件处理
 const handleSearch = () => {
-  console.log("跳转到搜索页面");
+  router.push({ name: 'search' });
 };
 
 const selectCategory = (index: number) => {
@@ -222,10 +225,14 @@ const selectCategory = (index: number) => {
 
 const switchTab = (index: number) => {
   activeTab.value = index;
-  if (index === 2) { // 收藏页
-    activeCategory.value = categories.value.findIndex(c => c.name === "已收藏");
-  } else if (index === 0) { // 首页
+  if (index === 0) { // 首页
     activeCategory.value = 0;
+  } else if (index === 1) { // 分类页
+    router.push({ name: 'categories' });
+  } else if (index === 2) { // 收藏页
+    router.push({ name: 'favorites' });
+  } else if (index === 3) { // 我的页面
+    router.push({ name: 'profile' });
   }
 };
 

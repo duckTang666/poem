@@ -1,9 +1,11 @@
 import { createRouter, createWebHistory, type RouteRecordRaw, type RouteLocationNormalized, type NavigationGuardNext } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
-  { path: '/', name: 'poems', component: () => import('../views/PoemList.vue') },
+  { path: '/', name: 'home', component: () => import('../views/PoemList.vue') },
+  { path: '/poems', name: 'poems', component: () => import('../views/PoemList.vue') },
   { path: '/about', name: 'about', component: () => import('../views/AboutView.vue'), meta: { requiresAuth: false } },
   { path: '/search', name: 'search', component: () => import('../views/SearchView.vue') },
+  { path: '/categories', name: 'categories', component: () => import('../views/CategoryNavView.vue') },
   { path: '/category/:name?', name: 'category', component: () => import('../views/CategoryView.vue') },
   { path: '/favorites', name: 'favorites', component: () => import('../views/FavoritesView.vue') },
   { path: '/profile', name: 'profile', component: () => import('../views/ProfileView.vue') },

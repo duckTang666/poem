@@ -5,8 +5,6 @@ const counter = useCounterStore();
 
 <template>
   <section>
-    <h2>About</h2>
-    <p>Pinia 计数器：{{ counter.count }}</p>
     <button @click="counter.increment()">+1</button>
   </section>
 </template>

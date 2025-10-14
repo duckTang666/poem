@@ -27,7 +27,17 @@ const filtered = computed(() => {
     if (name === '唐诗') return p.dynasty.includes('唐');
     if (name === '宋词') return p.dynasty.includes('宋');
     if (name === '元曲') return p.dynasty.includes('元');
+    if (name === '明诗') return p.dynasty.includes('明');
+    if (name === '清诗') return p.dynasty.includes('清');
     if (name === '现代诗') return p.dynasty.includes('近现代');
+    if (name === '李白') return p.author === '李白';
+    if (name === '苏轼') return p.author === '苏轼';
+    if (name === '李清照') return p.author === '李清照';
+    if (name === '毛泽东') return p.author === '毛泽东';
+    if (name === '徐志摩') return p.author === '徐志摩';
+    if (name === '爱国诗') return p.content.includes('国') || p.content.includes('家') || p.appreciation?.includes('爱国');
+    if (name === '思乡诗') return p.content.includes('乡') || p.content.includes('家') || p.appreciation?.includes('思乡');
+    if (name === '写景诗') return p.content.includes('山') || p.content.includes('水') || p.content.includes('花') || p.content.includes('月');
     return true;
   });
 });
