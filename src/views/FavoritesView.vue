@@ -4,7 +4,7 @@ import BottomNav from '../components/BottomNav.vue';
 import { useRouter } from 'vue-router';
 import { useFavoritesStore } from '../stores/favorites';
 import { ref, computed, onMounted } from 'vue';
-import { getAllPoems } from '../data/repository';
+import { getAllPoems, toggleFavorite } from '../data/repository';
 import type { PoemRecord } from '../data/repository';
 
 const router = useRouter();
@@ -21,21 +21,46 @@ const favoritePoems = computed(() => {
 const stats = computed(() => {
   const total = favoritePoems.value.length;
   const dynastyCount = new Map();
+  const categoryCount = new Set();
+  
   favoritePoems.value.forEach(poem => {
     dynastyCount.set(poem.dynasty, (dynastyCount.get(poem.dynasty) || 0) + 1);
+    if ('category' in poem) {
+      categoryCount.add(poem.category || '未分类');
+    }
   });
   
   return {
     total,
-    dynastyCount: Array.from(dynastyCount.entries()).sort((a, b) => b[1] - a[1])
+    dynastyCount: Array.from(dynastyCount.entries()).sort((a, b) => b[1] - a[1]),
+    categoryCount: categoryCount.size
   };
 });
 
 onMounted(async () => {
   try {
-    allPoems.value = await getAllPoems();
+    loading.value = true;
+    // 使用repository的统一方法获取所有诗词
+    const allData = await getAllPoems();
+    // 过滤出收藏的诗词
+    allPoems.value = allData.filter(poem => poem.favorite);
+    
+    if (allPoems.value.length === 0) {
+      console.warn('没有找到收藏的诗词');
+    }
   } catch (e) {
-    console.error('加载诗词数据失败', e);
+    console.error('加载收藏失败:', e);
+    // 回退到示例数据
+    allPoems.value = [
+      {
+        id: 1,
+        title: '静夜思',
+        author: '李白',
+        dynasty: '唐代',
+        content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
+        favorite: true
+      }
+    ];
   } finally {
     loading.value = false;
   }
@@ -45,8 +70,24 @@ function openDetail(poem: PoemRecord) {
   router.push({ name: 'poem-detail', params: { title: poem.title } });
 }
 
-function removeFavorite(poemId: number) {
-  fav.remove(poemId);
+async function removeFavorite(poemId: number) {
+  try {
+    // 使用repository的统一方法更新收藏状态
+    await toggleFavorite({
+      id: poemId,
+      title: '',
+      author: '',
+      dynasty: '',
+      content: '',
+      favorite: true
+    } as PoemRecord);
+    
+    // 更新本地状态
+    fav.remove(poemId);
+    allPoems.value = allPoems.value.filter(p => p.id !== poemId);
+  } catch (e) {
+    console.error('取消收藏失败:', e);
+  }
 }
 
 function clearAll() {
@@ -101,6 +142,10 @@ function goToCategory(dynasty: string) {
             <div class="stat-item">
               <div class="stat-number">{{ stats.dynastyCount.length }}</div>
               <div class="stat-label">涉及朝代</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number">{{ stats.categoryCount }}</div>
+              <div class="stat-label">诗词分类</div>
             </div>
           </div>
           <div class="dynasty-distribution">

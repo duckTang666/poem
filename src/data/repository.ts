@@ -1,7 +1,7 @@
 import { useFavoritesStore } from '../stores/favorites';
-import { fetchPoems, togglePoemFavorite, type PoemDTO } from '../api/poems';
+import { supabase } from '../api/supabase';
 
-export type PoemRecord = {
+export interface PoemRecord {
   id: number;
   title: string;
   author: string;
@@ -9,59 +9,136 @@ export type PoemRecord = {
   content: string;
   appreciation?: string | null;
   favorite: boolean;
-  image?: string; // 保持与视图兼容（后端暂无则为空）
-};
+  image?: string;
+  created_at?: string;
+}
 
-// 获取所有诗词（来自后端），并合并收藏状态（以用户收藏为准）
+// 直接从Supabase获取诗词数据
 export async function getAllPoems(): Promise<PoemRecord[]> {
-  const fav = safeFavorites();
-  const titles = new Set<string>((fav?.titles as string[]) || []);
-  const res = await fetchPoems(); // Result<PoemDTO[]>
-  const list = res.data || [];
-  return list.map(mapDtoToRecord(titles));
+  try {
+    const favStore = useFavoritesStore();
+    const favoriteTitles = new Set(favStore.list.map(id => id.toString()));
+    
+    const { data, error } = await supabase
+      .from('poems')
+      .select('*');
+
+    if (error) throw error;
+    
+    return (data || []).map(poem => ({
+      id: poem.id,
+      title: poem.title,
+      author: poem.author,
+      dynasty: poem.dynasty,
+      content: poem.content,
+      appreciation: poem.appreciation,
+      favorite: favoriteTitles.has(poem.id.toString()) || poem.favorite,
+      image: poem.image,
+      created_at: poem.created_at
+    }));
+  } catch (error) {
+    console.error('获取诗词失败:', error);
+    return [];
+  }
 }
 
-// 根据标题获取单条（从后端列表中过滤）
-export async function getPoemByTitle(title: string): Promise<PoemRecord | undefined> {
-  const all = await getAllPoems();
-  return all.find((p) => p.title === title);
+// 根据分类获取诗词
+export async function getPoemsByCategory(category: string): Promise<PoemRecord[]> {
+  try {
+    const favStore = useFavoritesStore();
+    const favoriteTitles = new Set(favStore.list.map(id => id.toString()));
+
+    // 处理朝代分类
+    const dynastyMap: Record<string, string> = {
+      '唐诗': '唐',
+      '宋词': '宋',
+      '元曲': '元',
+      '现代诗': '近现代'
+    };
+
+    let query = supabase
+      .from('poems')
+      .select('*');
+
+    if (dynastyMap[category]) {
+      query = query.ilike('dynasty', `%${dynastyMap[category]}%`);
+    } else {
+      // 处理作者分类
+      const authorMap: Record<string, string> = {
+        '李白': '李白',
+        '苏轼': '苏轼',
+        '李清照': '李清照'
+      };
+
+      if (authorMap[category]) {
+        query = query.eq('author', authorMap[category]);
+      } else {
+        // 处理主题分类
+        query = query.or(`content.ilike.%${category}%,appreciation.ilike.%${category}%`);
+      }
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    
+    return (data || []).map(poem => ({
+      id: poem.id,
+      title: poem.title,
+      author: poem.author,
+      dynasty: poem.dynasty,
+      content: poem.content,
+      appreciation: poem.appreciation,
+      favorite: favoriteTitles.has(poem.id.toString()) || poem.favorite,
+      image: poem.image,
+      created_at: poem.created_at
+    }));
+  } catch (error) {
+    console.error(`获取"${category}"分类诗词失败:`, error);
+    return [];
+  }
 }
 
-// 切换收藏状态：后端更新 + 本地收藏 store 同步
+// 根据标题获取单条诗词
+export async function getPoemByTitle(title: string): Promise<PoemRecord | null> {
+  try {
+    const { data, error } = await supabase
+      .from('poems')
+      .select('*')
+      .eq('title', title)
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error(`获取诗词"${title}"失败:`, error);
+    return null;
+  }
+}
+
+// 切换收藏状态
 export async function toggleFavorite(poem: PoemRecord) {
   if (!poem?.id) return;
-  await togglePoemFavorite(poem.id);
-  const fav = safeFavorites(true);
-  if (!fav) return;
-  const plain = {
-    title: poem.title,
-    author: poem.author,
-    dynasty: poem.dynasty,
-    preview: (poem.appreciation || poem.content || '').slice(0, 30) + '…',
-    image: (poem as any).image || ''
-  };
-  fav.toggle(plain as any);
-}
-
-function mapDtoToRecord(titles: Set<string>) {
-  return (dto: PoemDTO): PoemRecord => ({
-    id: dto.id,
-    title: dto.title,
-    author: dto.author,
-    dynasty: dto.dynasty,
-    content: dto.content,
-    appreciation: dto.appreciation ?? null,
-    favorite: titles.has(dto.title) ? true : dto.favorite === true || dto.favorite === 1,
-    image: (dto as any).image || '' // 后端若无该字段则为空
-  });
-}
-
-// 优雅获取收藏 store（在组件外调用时避免 SSR/初始化问题）
-function safeFavorites(mutate = false): any {
+  
   try {
-    const store = useFavoritesStore();
-    return mutate ? store : { titles: store.titles };
-  } catch {
-    return null;
+    const favStore = useFavoritesStore();
+    const newFavoriteState = !favStore.list.includes(poem.id);
+    
+    // 更新Supabase中的收藏状态
+    const { error } = await supabase
+      .from('poems')
+      .update({ favorite: newFavoriteState })
+      .eq('id', poem.id);
+
+    if (error) throw error;
+
+    // 更新本地收藏状态
+    if (newFavoriteState) {
+      favStore.add(poem.id);
+    } else {
+      favStore.remove(poem.id);
+    }
+  } catch (error) {
+    console.error('切换收藏状态失败:', error);
   }
 }

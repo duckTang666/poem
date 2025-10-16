@@ -111,7 +111,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue';
-import { fetchPoems, type PoemDTO } from '@/api/poems';
+import { type PoemDTO } from '@/api/poems';
+import { supabaseRequest, supabaseUpdate } from '@/api/http';
 import '@/styles/poem-list.css';
 import { useRouter } from 'vue-router';
 import { useFavoritesStore } from '../stores/favorites';
@@ -132,18 +133,42 @@ const activeTab = ref(0);
 
 // 分类导航数据
 const categories = ref([
-  { name: "全部", filter: () => true },
-  { name: "唐诗", filter: (p: PoemDTO) => p.dynasty === "唐" },
-  { name: "宋词", filter: (p: PoemDTO) => p.dynasty === "宋" },
-  { name: "元曲", filter: (p: PoemDTO) => p.dynasty === "元" },
-  { name: "明诗", filter: (p: PoemDTO) => p.dynasty === "明" },
-  { name: "清诗", filter: (p: PoemDTO) => p.dynasty === "清" },
-  { name: "现代诗", filter: (p: PoemDTO) => p.dynasty === "近现代" },
-  { name: "李白", filter: (p: PoemDTO) => p.author === "李白" },
-  { name: "苏轼", filter: (p: PoemDTO) => p.author === "苏轼" },
-  { name: "李清照", filter: (p: PoemDTO) => p.author === "李清照" },
-  { name: "毛泽东", filter: (p: PoemDTO) => p.author === "毛泽东" }
+  { 
+    name: "全部", 
+    filter: () => true, 
+    query: {},
+    route: 'home'
+  },
+  { 
+    name: "收藏", 
+    filter: (p: PoemDTO) => p.favorite, 
+    query: { favorite: 'eq.true' },
+    route: 'favorites'
+  },
+  // 其他分类...
 ]);
+
+// 共享的诗词数据获取方法
+async function fetchPoemsFromSupabase(filterParams = {}) {
+  try {
+    const poemsData = await supabaseRequest<PoemDTO>('poems', {
+      params: {
+        select: '*',
+        ...filterParams
+      }
+    });
+    
+    if (!poemsData) return [];
+    
+    return poemsData.map((p: PoemDTO) => ({
+      ...p,
+      favorite: !!p.favorite
+    }));
+  } catch (error) {
+    console.error('获取诗词失败:', error);
+    return [];
+  }
+}
 
 // 轮播图数据（基于实际诗词数据生成）
 const carouselItems = computed(() => {
@@ -165,8 +190,17 @@ const bottomNavItems = ref([
 
 // 过滤后的诗词列表
 const filteredPoems = computed(() => {
-  const filterFn = categories.value[activeCategory.value]?.filter;
-  return filterFn ? poems.value.filter(filterFn) : poems.value;
+  // 从Supabase获取过滤后的数据
+  return poems.value.filter(poem => {
+    const category = categories.value[activeCategory.value];
+    if (!category) return true;
+    
+    // 特殊分类处理
+    if (category.name === "收藏") {
+      return poem.favorite;
+    }
+    return category.filter(poem);
+  });
 });
 
 // 获取诗词预览文本
@@ -193,25 +227,45 @@ async function loadPoems() {
   loading.value = true;
   error.value = '';
   try {
-    const res = await fetchPoems();
-    if (res.code === 0) {
-      poems.value = (res.data || []).map((p) => ({ 
-        ...p, 
-        favorite: !!p.favorite 
-      }));
-    } else {
-      error.value = res.message || '加载失败';
+    const currentCategory = categories.value[activeCategory.value];
+    const result = await fetchPoemsFromSupabase(currentCategory.query);
+    
+    if (!result || result.length === 0) {
+      throw new Error('没有找到诗词数据');
     }
+    
+    poems.value = result;
   } catch (e: any) {
-    error.value = e?.message || '网络错误';
+    error.value = e?.message || '加载诗词失败';
+    console.error('加载诗词错误:', e);
+    poems.value = [];
   } finally {
     loading.value = false;
   }
 }
 
 // 切换收藏状态
-function toggleFavorite(poem: PoemDTO) {
-  favoritesStore.toggle(poem.id);
+async function toggleFavorite(poem: PoemDTO) {
+  const newFavoriteState = !poem.favorite;
+  try {
+    // 先更新本地状态以获得即时反馈
+    poem.favorite = newFavoriteState;
+    favoritesStore.toggle(poem.id);
+    
+    // 同步到Supabase
+    const { error } = await supabaseUpdate<PoemDTO>('poems', poem.id, {
+      favorite: newFavoriteState
+    });
+
+    if (error) throw new Error(error.message);
+    
+  } catch (error) {
+    // 出错时回滚状态
+    poem.favorite = !newFavoriteState;
+    favoritesStore.toggle(poem.id);
+    console.error('收藏操作失败:', error);
+    alert('收藏状态更新失败，请重试');
+  }
 }
 
 // 事件处理
@@ -219,8 +273,9 @@ const handleSearch = () => {
   router.push({ name: 'search' });
 };
 
-const selectCategory = (index: number) => {
+const selectCategory = async (index: number) => {
   activeCategory.value = index;
+  await loadPoems(); // 切换分类时重新加载数据
 };
 
 const switchTab = (index: number) => {

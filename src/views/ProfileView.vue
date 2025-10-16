@@ -5,7 +5,8 @@ import { useRouter } from 'vue-router';
 import { useUserStore } from '../stores/user';
 import { useFavoritesStore } from '../stores/favorites';
 import { ref, computed, onMounted } from 'vue';
-import { getAllPoems } from '../data/repository';
+import { supabaseRequest } from '@/api/http';
+import type { PoemDTO } from '@/api/poems';
 import type { PoemRecord } from '../data/repository';
 
 const router = useRouter();
@@ -54,9 +55,20 @@ const recentFavorites = computed(() => {
 
 onMounted(async () => {
   try {
-    allPoems.value = await getAllPoems();
+    // 从Supabase获取诗词数据
+    const data = await supabaseRequest<PoemDTO>('poems');
+    allPoems.value = data || [];
+    
+    // 获取收藏统计
+    const favRes = await supabaseRequest('poems', {
+      params: {
+        favorite: 'eq.true',
+        select: 'count'
+      }
+    });
+    readingStats.value.favoriteCount = favRes.length || 0;
   } catch (e) {
-    console.error('加载诗词数据失败', e);
+    console.error('加载数据失败', e);
   }
 });
 

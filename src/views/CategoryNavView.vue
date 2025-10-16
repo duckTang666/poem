@@ -2,7 +2,9 @@
   <div class="page-container">
     <TopNav title="诗词分类" @search="router.push({name:'search'})" @back="router.push({name:'home'})" />
     
-    <div class="content">
+    <div v-if="loading" class="loading">加载分类数据中...</div>
+  
+  <div v-else class="content">
       <!-- 朝代分类 -->
       <div class="category-section">
         <h2 class="section-title">📚 按朝代分类</h2>
@@ -204,11 +206,32 @@ const specialCategories = ref([
   }
 ]);
 
+const loading = ref(true);
+
 onMounted(async () => {
   try {
-    allPoems.value = await getAllPoems();
+    loading.value = true;
+    const data = await getAllPoems();
+    allPoems.value = data;
+    
+    if (data.length === 0) {
+      console.warn('获取到的诗词数据为空');
+    }
   } catch (e) {
-    console.error('加载诗词数据失败', e);
+    console.error('加载诗词数据失败:', e);
+    // 回退到示例数据
+    allPoems.value = [
+      {
+        id: 1,
+        title: '静夜思',
+        author: '李白',
+        dynasty: '唐代',
+        content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
+        favorite: false
+      }
+    ];
+  } finally {
+    loading.value = false;
   }
 });
 
@@ -466,5 +489,12 @@ const goToCategory = (categoryName: string) => {
   font-size: 11px;
   color: #7f8c8d;
   line-height: 1.3;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 16px;
 }
 </style>

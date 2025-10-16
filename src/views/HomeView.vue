@@ -37,8 +37,12 @@ const categories = ref([
   { name: '宋词' },
   { name: '元曲' },
   { name: '现代诗' },
-  { name: '古风' },
-  { name: '乐府' }
+  { name: '李白' },
+  { name: '苏轼' },
+  { name: '李清照' },
+  { name: '爱国诗' },
+  { name: '思乡诗' },
+  { name: '写景诗' }
 ]);
 
 // 激活的分类索引
@@ -46,13 +50,35 @@ const activeCategory = ref(0);
 
 import type { PoemRecord } from '../data/repository';
 
-// 诗词列表数据（改为异步加载后端数据）
+// 诗词列表数据
 const poems = ref<PoemRecord[]>([]);
+const loading = ref(true);
+
 onMounted(async () => {
   try {
-    poems.value = await getAllPoems();
+    loading.value = true;
+    const data = await getAllPoems();
+    poems.value = data;
+    
+    // 检查数据是否为空
+    if (data.length === 0) {
+      console.warn('获取到的诗词数据为空，请检查Supabase连接和数据');
+    }
   } catch (e) {
-    console.error('加载诗词失败', e);
+    console.error('加载诗词失败:', e);
+    // 回退到本地示例数据
+    poems.value = [
+      {
+        id: 1,
+        title: '静夜思',
+        author: '李白',
+        dynasty: '唐代',
+        content: '床前明月光，疑是地上霜。举头望明月，低头思故乡。',
+        favorite: false
+      }
+    ];
+  } finally {
+    loading.value = false;
   }
 });
 
@@ -155,8 +181,13 @@ onBeforeUnmount(stopAutoplay);
     </div>
 
     <!-- 热门诗词列表 -->
-    <div class="poem-list">
-      <div class="poem-card" v-for="(poem, index) in poems" :key="index" @click="router.push({ name: 'poem-detail', params: { title: poem.title } })">
+    <div v-if="loading" class="loading">加载诗词中...</div>
+    <div v-else class="poem-list">
+      <div v-if="poems.length === 0" class="empty">
+        <p>暂无诗词数据</p>
+        <button @click="router.push({name:'category',params:{name:'唐诗'}})">浏览唐诗</button>
+      </div>
+      <div v-else class="poem-card" v-for="(poem, index) in poems" :key="index" @click="router.push({ name: 'poem-detail', params: { title: poem.title } })">
         <div class="card-content">
           <div class="poem-title">{{ poem.title }}</div>
           <div class="poem-meta">
@@ -391,6 +422,22 @@ onBeforeUnmount(stopAutoplay);
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+}
+
+.loading, .empty {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.empty button {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #4a2c2a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 .poem-image {
   width: 100px;
