@@ -6,6 +6,7 @@ import { useUserStore } from '../stores/user';
 import { useFavoritesStore } from '../stores/favorites';
 import { ref, computed, onMounted } from 'vue';
 import { supabaseRequest } from '@/api/http';
+import { logout } from '@/api/auth';
 import type { PoemDTO } from '@/api/poems';
 import type { PoemRecord } from '../data/repository';
 
@@ -92,6 +93,16 @@ function goToFavorites() {
 
 function goToCategory(categoryName: string) {
   router.push({ name: 'category', params: { name: categoryName } });
+}
+
+async function handleLogout() {
+  try {
+    await logout();
+    router.push('/login');
+  } catch (error) {
+    console.error('退出登录失败:', error);
+    alert('退出登录失败，请重试');
+  }
 }
 </script>
 
@@ -236,6 +247,14 @@ function goToCategory(categoryName: string) {
             </div>
             <input type="checkbox" :checked="user.settings.notifications" @change="user.toggleNotifications" class="toggle" />
           </div>
+        </div>
+
+        <!-- 退出登录按钮 -->
+        <div class="logout-section">
+          <button @click="handleLogout" class="logout-btn">
+            <span class="logout-icon">🚪</span>
+            <span>退出登录</span>
+          </button>
         </div>
       </div>
     </div>
@@ -690,5 +709,35 @@ function goToCategory(categoryName: string) {
 
 .toggle:checked::before {
   transform: translateX(20px);
+}
+
+/* 退出登录按钮 */
+.logout-section {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #f8f9fa;
+  color: #e74c3c;
+  border: 1px solid #e74c3c;
+  border-radius: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  background: #e74c3c;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.logout-icon {
+  font-size: 18px;
 }
 </style>
