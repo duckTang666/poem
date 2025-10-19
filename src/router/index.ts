@@ -1,6 +1,34 @@
 import { createRouter, createWebHistory, type RouteRecordRaw, type RouteLocationNormalized, type NavigationGuardNext } from 'vue-router';
 
 const routes: RouteRecordRaw[] = [
+  {
+    path: '/ai-search',
+    name: 'ai-search',
+    component: () => import('../views/AISearchView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/ai-search',
+    name: 'ai-search',
+    component: () => import('../views/AISearchView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/ai-search',
+    name: 'ai-search',
+    component: () => import('../views/AISearchView.vue').catch((error) => {
+      console.error('加载AISearchView组件失败:', error);
+      return import('../views/FallbackView.vue').then(module => {
+        // 添加3秒超时自动刷新
+        setTimeout(() => {
+          if (!window.location.href.includes('ai-search')) return;
+          window.location.reload();
+        }, 3000);
+        return module;
+      });
+    }),
+    meta: { requiresAuth: true }
+  },
   { path: '/', redirect: '/login' }, // 根路径重定向到登录页
   { path: '/poems', name: 'poems', component: () => import('../views/PoemList.vue'), meta: { requiresAuth: true } },
   { path: '/about', name: 'about', component: () => import('../views/AboutView.vue'), meta: { requiresAuth: false } },
@@ -20,6 +48,7 @@ const router = createRouter({
 });
 
 import { getCurrentUser } from '@/api/auth';
+// 备用组件已通过动态导入方式引用，无需静态导入
 
 // 认证守卫
 router.beforeEach(async (to: RouteLocationNormalized, from: RouteLocationNormalized, next: NavigationGuardNext) => {

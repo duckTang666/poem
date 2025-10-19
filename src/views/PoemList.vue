@@ -3,7 +3,10 @@
     <!-- 顶部导航栏 -->
     <div class="top-nav">
       <span class="nav-title">诗词鉴赏</span>
-      <div class="search-icon" @click="handleSearch">🔍</div>
+      <div class="nav-icons">
+        <div class="ai-search-icon" @click="goToAISearch">🤖</div>
+        <div class="search-icon" @click="handleSearch">🔍</div>
+      </div>
     </div>
 
     <!-- 加载状态 -->
@@ -271,6 +274,10 @@ async function toggleFavorite(poem: PoemDTO) {
 // 事件处理
 const handleSearch = () => {
   router.push({ name: 'search' });
+};
+
+const goToAISearch = () => {
+  router.push({ name: 'ai-search' });
 };
 
 const selectCategory = async (index: number) => {

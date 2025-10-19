@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import axios from 'axios';
 import { useRouter } from 'vue-router';
 import TopNav from '../components/TopNav.vue';
 import BottomNav from '../components/BottomNav.vue';
@@ -131,6 +132,97 @@ const switchTab = (index: number) => {
 
 onMounted(startAutoplay);
 onBeforeUnmount(stopAutoplay);
+
+// AI诗歌搜索功能
+const searchInput = ref('');
+const searchResults = ref([]);
+const searchLoading = ref(false);
+
+const searchPoetry = async () => {
+  if (!searchInput.value.trim()) {
+    searchResults.value = [{ error: '请输入搜索内容' }];
+    return;
+  }
+  
+  searchLoading.value = true;
+  searchResults.value = [];
+  
+  try {
+    const response = await axios.post(
+      'https://ducktang.app.n8n.cloud/webhook-test/ai-chat',
+      { 
+        query: searchInput.value,
+        type: 'poetry_search'
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    // 处理不同格式的响应
+    if (response.data?.results) {
+      searchResults.value = response.data.results;
+    } else if (Array.isArray(response.data)) {
+      searchResults.value = response.data;
+    } else {
+      searchResults.value = [response.data];
+    }
+  } catch (error) {
+    console.error('搜索请求失败:', error);
+    searchResults.value = [{ 
+      error: error.response?.data?.message || '请求失败，请稍后重试'
+    }];
+  } finally {
+    searchLoading.value = false;
+  }
+};
+
+// AI诗词鉴赏功能
+const aiInput = ref('');
+const aiResult = ref('');
+const aiLoading = ref(false);
+
+const submitPoetry = async () => {
+  if (!aiInput.value.trim()) return;
+  
+  aiLoading.value = true;
+  aiResult.value = '';
+  
+  try {
+    const response = await axios.post(
+      'https://ducktang.app.n8n.cloud/webhook-test/ai-chat/poetry',
+      { poetry: aiInput.value },
+      {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    // 解析不同格式的响应
+    if (typeof response.data === 'string') {
+      aiResult.value = response.data;
+    } else if (response.data?.message) {
+      aiResult.value = response.data.message;
+    } else if (response.data?.choices?.[0]?.message?.content) {
+      aiResult.value = response.data.choices[0].message.content;
+    } else {
+      aiResult.value = '收到响应但无法解析结果';
+    }
+  } catch (error) {
+    aiResult.value = '鉴赏失败，请稍后再试';
+    console.error('AI鉴赏出错:', error);
+    if (error.response) {
+      console.error('响应状态:', error.response.status);
+      console.error('响应数据:', error.response.data);
+    }
+  } finally {
+    aiLoading.value = false;
+  }
+};
 </script>
 
 <template>
@@ -162,6 +254,59 @@ onBeforeUnmount(stopAutoplay);
           :class="{ active: currentSlide === idx }"
           @click="currentSlide = idx"
         ></span>
+      </div>
+    </div>
+
+    <!-- AI诗歌搜索区 -->
+    <div class="search-section" style="margin-top: 20px;">
+      <div style="max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px;">
+        <h3 style="color: #4a2c2a; margin-bottom: 16px;">AI诗歌搜索</h3>
+        <div style="display: flex; gap: 10px;">
+          <input
+            v-model="searchInput"
+            style="flex:1; padding:12px; border:1px solid #ddd; border-radius:8px;"
+            placeholder="输入诗句或关键词..."
+            @keyup.enter="searchPoetry"
+          />
+          <button 
+            @click="searchPoetry"
+            style="padding:0 20px; background:#6b4a3e; color:white; border:none; border-radius:8px;"
+          >
+            {{ searchLoading ? '搜索中...' : '搜索' }}
+          </button>
+        </div>
+        
+        <div v-if="searchResults.length > 0" style="margin-top: 20px;">
+          <div 
+            v-for="(item, index) in searchResults" 
+            :key="index" 
+            style="padding:16px; margin-bottom:12px; background:#f9f6f1; border-radius:8px;"
+          >
+            <h4 v-if="item.title" style="color:#4a2c2a; margin-bottom:8px;">{{ item.title }}</h4>
+            <p v-if="item.author" style="color:#6b4a3e;">{{ item.author }}</p>
+            <p v-if="item.content" style="color:#5d4037; margin-top:8px; white-space:pre-line;">{{ item.content }}</p>
+            <p v-if="item.error" style="color:#c00;">{{ item.error }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 诗词鉴赏AI交互区 -->
+    <div class="ai-section">
+      <div class="ai-container">
+        <h3 class="ai-title">诗词鉴赏AI助手</h3>
+        <textarea 
+          v-model="aiInput" 
+          class="ai-input" 
+          placeholder="请输入您想鉴赏的诗词..."
+          rows="3"
+        ></textarea>
+        <button class="ai-submit" @click="submitPoetry">开始鉴赏</button>
+        <div v-if="aiLoading" class="ai-loading">AI正在分析中...</div>
+        <div v-if="aiResult" class="ai-result">
+          <h4>鉴赏结果：</h4>
+          <div class="ai-content">{{ aiResult }}</div>
+        </div>
       </div>
     </div>
 
@@ -208,6 +353,159 @@ onBeforeUnmount(stopAutoplay);
 </template>
 
 <style scoped>
+/* 搜索区样式 */
+.search-section {
+  padding: 20px;
+  background: linear-gradient(to right, #f0f7ff, #e6f0ff);
+  border-bottom: 1px solid #d0e0ff;
+}
+
+.search-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.search-title {
+  color: #2c4a7a;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.search-input-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.search-submit {
+  background: linear-gradient(to right, #4a6b9a, #3a5a8a);
+  color: white;
+  border: none;
+  padding: 0 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.search-submit:hover {
+  opacity: 0.9;
+}
+
+.search-results {
+  margin-top: 16px;
+}
+
+.search-result-item {
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  border-left: 4px solid #4a6b9a;
+}
+
+.search-meta {
+  color: #666;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.search-content {
+  color: #333;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.search-error {
+  color: #c00;
+}
+
+/* AI交互区样式 */
+.ai-section {
+  padding: 20px;
+  background: linear-gradient(to right, #f9f6f1, #f0e6d2);
+  border-bottom: 1px solid #e0d0b1;
+}
+
+.ai-container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.ai-title {
+  color: #4a2c2a;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.ai-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  resize: none;
+}
+
+.ai-submit {
+  background: linear-gradient(to right, #6b4a3e, #8c6b5a);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.ai-submit:hover {
+  opacity: 0.9;
+}
+
+.ai-loading {
+  text-align: center;
+  padding: 12px;
+  color: #666;
+}
+
+.ai-result {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f9f6f1;
+  border-radius: 8px;
+}
+
+.ai-result h4 {
+  color: #4a2c2a;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+
+.ai-content {
+  color: #5d4037;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
 .page-container {
   display: flex;
   flex-direction: column;

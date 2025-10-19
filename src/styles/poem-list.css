@@ -31,16 +31,22 @@
   letter-spacing: 1px;
 }
 
-.search-icon {
+.nav-icons {
+  display: flex;
+  gap: 12px;
+}
+
+.search-icon, .ai-search-icon {
   font-size: 18px;
   cursor: pointer;
   padding: 8px;
   border-radius: 50%;
-  transition: background-color 0.3s;
+  transition: all 0.3s;
 }
 
-.search-icon:hover {
+.search-icon:hover, .ai-search-icon:hover {
   background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
 }
 
 /* 加载和错误状态 */
